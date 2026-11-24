@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bắn mục tiêu Oxy</title>
+<style>
+:root{--bg:#eef2f7;--surface:#fff;--ink:#0d2238;--mute:#5a6b80;--line:#d3dce8;--field:#f7fafc;--grid:#d5e0ec;--grid2:#9fb4c9;--ground:#dfe8f1;--wall:#5d6f86;--shot:#e8731a;--hit:#12906f;--bad:#d23c47;--ring:#d23c47;
+ box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1626;--surface:#112238;--ink:#e6eef8;--mute:#93a6bc;--line:#243a56;--field:#0d1b2e;--grid:#1a2e47;--grid2:#47617f;--ground:#132740;--wall:#8497b0;--shot:#ffa04d;--hit:#3ddbab;--bad:#ff6b75;--ring:#ff6b75;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0a1626;--surface:#112238;--ink:#e6eef8;--mute:#93a6bc;--line:#243a56;--field:#0d1b2e;--grid:#1a2e47;--grid2:#47617f;--ground:#132740;--wall:#8497b0;--shot:#ffa04d;--hit:#3ddbab;--bad:#ff6b75;--ring:#ff6b75;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif}
+main{max-width:980px;margin:0 auto;padding:14px 14px 28px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 18px;margin-bottom:10px}
+h1{font-size:1.45rem;margin:0;letter-spacing:-.01em}
+.stats{display:flex;gap:16px;color:var(--mute);font-size:.95rem}
+.stats b{color:var(--ink);font-variant-numeric:tabular-nums}
+.stage{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--field)}
+canvas{display:block;width:100%;aspect-ratio:26/15;touch-action:none}
+.mission{margin:10px 0 0;font-size:1.02rem}
+.mission b{color:var(--ring)}
+#msg{min-height:2.9em;margin:6px 0 0;font-weight:600}
+#msg.ok{color:var(--hit)}#msg.bad{color:var(--bad)}#msg.info{color:var(--mute);font-weight:500}
+.panel{margin-top:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:12px}
+.seg button{border:0;background:transparent;color:var(--mute);padding:7px 14px;font:inherit;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg);font-weight:600}
+.row{display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center;margin-bottom:8px}
+.row label{color:var(--mute);font-family:Consolas,"SF Mono",Menlo,monospace;white-space:nowrap}
+input{width:100%;font:1.05rem Consolas,"SF Mono",Menlo,monospace;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--field);color:var(--ink)}
+input:focus-visible,button:focus-visible{outline:2px solid var(--shot);outline-offset:2px}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.btn{font:inherit;font-weight:600;padding:9px 16px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn.fire{background:var(--shot);border-color:var(--shot);color:#1a0f05;padding:9px 26px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;align-items:center;color:var(--mute);font-size:.9rem}
+.chip{font:.88rem Consolas,"SF Mono",Menlo,monospace;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--field);color:var(--ink);cursor:pointer}
+details{margin-top:12px;color:var(--mute);font-size:.93rem}
+summary{cursor:pointer;color:var(--ink);font-weight:600}
+details p{margin:6px 0}
+code{font-family:Consolas,"SF Mono",Menlo,monospace;color:var(--ink)}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<main>
+<header>
+ <h1>Bắn mục tiêu Oxy</h1>
+ <div class="stats"><span>Màn <b id="lv">1</b>/5</span><span>Điểm <b id="sc">0</b></span><span>Lượt bắn <b id="at">0</b></span></div>
+</header>
+<div class="stage"><canvas id="cv" aria-label="Mặt phẳng tọa độ Oxy với súng tại gốc O và mục tiêu"></canvas></div>
+<p class="mission" id="mission"></p>
+<p id="msg" class="info" role="status"></p>
+
+<section class="panel">
+ <div class="seg" role="group" aria-label="Kiểu phương trình">
+  <button id="m-param" aria-pressed="true">x(t), y(t)</button>
+  <button id="m-func" aria-pressed="false">y = f(x)</button>
+ </div>
+ <div id="f-param">
+  <div class="row"><label for="ix">x(t) =</label><input id="ix" value="10*t" autocomplete="off" spellcheck="false"></div>
+  <div class="row"><label for="iy">y(t) =</label><input id="iy" value="12*t-5*t^2" autocomplete="off" spellcheck="false"></div>
+  <div class="row"><label for="it">t từ 0 đến</label><input id="it" value="2.4" inputmode="decimal" autocomplete="off"></div>
+ </div>
+ <div id="f-func" hidden>
+  <div class="row"><label for="ifn">y(x) =</label><input id="ifn" value="0.4*x" autocomplete="off" spellcheck="false"></div>
+ </div>
+ <div class="actions">
+  <button class="btn fire" id="fire">Bắn!</button>
+  <button class="btn" id="clear">Xóa vết đạn</button>
+  <button class="btn" id="hint">Gợi ý</button>
+  <button class="btn" id="next" hidden>Màn tiếp theo</button>
+ </div>
+ <div class="chips"><span>Thử nhanh:</span><span id="chips"></span></div>
+ <details>
+  <summary>Cách chơi và cú pháp</summary>
+  <p>Súng đặt tại gốc O(0; 0). Nhập phương trình quỹ đạo sao cho đường đạn đi qua mục tiêu và không đụng tường. Đạn phải xuất phát từ O tại t = 0.</p>
+  <p>Cú pháp: <code>+ − * / ^</code>, viết <code>3t</code> hoặc <code>3*t</code> đều được. Hàm: <code>sin cos tan sqrt abs exp ln log</code>, hằng số <code>pi</code>, <code>e</code>. Ví dụ: <code>12*t-5*t^2</code>, <code>-0.09*x^2+1.6*x</code>.</p>
+  <p>Đạn dừng khi trúng mục tiêu, đụng tường, chạm đất (y &lt; 0) hoặc bay ra ngoài khung. Rê chuột lên khung để đọc tọa độ.</p>
+ </details>
+</section>
+</main>
+
+<script>
+(function(){
+"use strict";
+var X0=-2,X1=24,Y0=-2,Y1=13,TR=0.7,N=900;
+var LEVELS=[
+ {t:[10,4],w:[],hint:"Đường thẳng đi qua O và M(10; 4): y = kx với k = 4/10."},
+ {t:[16,2],w:[[9,0,10,6]],hint:"Cần một đường cong bay cao hơn 6 khi 9 ≤ x ≤ 10 rồi hạ xuống M(16; 2). Thử parabol y = ax² + bx."},
+ {t:[12,9],w:[[6,0,7,4]],hint:"Đường thẳng đủ dốc đi qua O và M(12; 9) đã vượt tường. Hệ số góc 9/12 = 0,75."},
+ {t:[20,0.5],w:[[10,0,11,8]],hint:"Tường cao 8: đỉnh parabol phải cao hơn 8 quanh x ≈ 10. Rồi rơi xuống M(20; 0,5)."},
+ {t:[6,11],w:[[2,5,5,6]],hint:"Có thanh chắn ngang ở 2 ≤ x ≤ 5, 5 ≤ y ≤ 6. Hãy bay vòng lên trên nó, sau đó tới M(6; 11)."}
+];
+var CHIPS=[
+ {l:"y = 0.4x",m:"func",f:"0.4*x"},
+ {l:"parabol",m:"func",f:"-0.09*x^2+1.6*x"},
+ {l:"ném xiên",m:"param",x:"10*t",y:"12*t-5*t^2",T:"2.4"},
+ {l:"x=3t−t³, y=4t²",m:"param",x:"3*t-t^3",y:"4*t^2",T:"1.7"}
+];
+var $=function(i){return document.getElementById(i)};
+var cv=$("cv"),ctx=cv.getContext("2d"),dpr=1;
+var mode="param",lvl=0,score=0,attempts=0,anim=null,trails=[],fx=null,mouse=null,angle=Math.PI/4,solved=false;
+
+/* ---- bộ phân tích biểu thức an toàn ---- */
+var FN={sin:Math.sin,cos:Math.cos,tan:Math.tan,asin:Math.asin,acos:Math.acos,atan:Math.atan,sqrt:Math.sqrt,abs:Math.abs,exp:Math.exp,ln:Math.log,log:Math.log10,pow:Math.pow};
+function compile(src){
+ var s=String(src).toLowerCase().replace(/^[^=]*=/,"").replace(/(\d),(\d)/g,"$1.$2")
+  .replace(/π/g,"pi").replace(/×/g,"*").replace(/[−–]/g,"-").replace(/²/g,"^2").replace(/³/g,"^3");
+ var tk=s.match(/\d*\.?\d+(?:e[+-]?\d+)?|[a-z]+|[-+*\/^(),]|\S/g)||[],p=0;
+ if(!tk.length)throw new Error("Chưa nhập phương trình.");
+ var pk=function(){return tk[p]},nx=function(){return tk[p++]};
+ var isN=function(k){return k!==undefined&&/^[\d.]/.test(k)},isI=function(k){return k!==undefined&&/^[a-z]/.test(k)};
+ function expr(){var l=term();while(pk()==="+"||pk()==="-"){var o=nx(),a=l,b=term();l=o==="+"?function(v){return a(v)+b(v)}:function(v){return a(v)-b(v)}}return l}
+ function term(){var l=un();for(;;){var k=pk(),a=l,b;
+  if(k==="*"||k==="/"){nx();b=un();l=k==="*"?(function(a,b){return function(v){return a(v)*b(v)}})(a,b):(function(a,b){return function(v){return a(v)/b(v)}})(a,b)}
+  else if(isN(k)||isI(k)||k==="("){b=pw();l=(function(a,b){return function(v){return a(v)*b(v)}})(a,b)}
+  else break}return l}
+ function un(){if(pk()==="-"){nx();var u=un();return function(v){return -u(v)}}if(pk()==="+"){nx();return un()}return pw()}
+ function pw(){var b=atom();if(pk()==="^"){nx();var e=un();return function(v){return Math.pow(b(v),e(v))}}return b}
+ function atom(){var k=nx();
+  if(k===undefined)throw new Error("Biểu thức bị thiếu vế sau toán tử.");
+  if(isN(k)){var c=parseFloat(k);if(isNaN(c))throw new Error("Số không hợp lệ: "+k);return function(){return c}}
+  if(k==="("){var e=expr();if(nx()!==")")throw new Error("Thiếu dấu đóng ngoặc.");return e}
+  if(isI(k)){
+   if(k==="t"||k==="x")return function(v){return v};
+   if(k==="pi")return function(){return Math.PI};
+   if(k==="e")return function(){return Math.E};
+   if(FN[k]&&pk()==="("){nx();var args=[expr()];while(pk()===","){nx();args.push(expr())}
+    if(nx()!==")")throw new Error("Thiếu dấu đóng ngoặc sau hàm "+k+".");
+    var f=FN[k];return function(v){return f.apply(null,args.map(function(a){return a(v)}))}}
+   throw new Error("Không nhận ra “"+k+"”. Biến dùng là "+(mode==="param"?"t":"x")+".");}
+  throw new Error("Ký tự không hợp lệ: "+k);}
+ var fn=expr();if(p<tk.length)throw new Error("Biểu thức sai cú pháp gần “"+tk[p]+"”.");return fn}
+
+/* ---- giao diện ---- */
+var f1=function(n){return n.toFixed(1).replace(".",",").replace(",0","")};
+function say(t,c){var m=$("msg");m.textContent=t;m.className=c||"info"}
+function setMode(m){mode=m;$("m-param").setAttribute("aria-pressed",m==="param");$("m-func").setAttribute("aria-pressed",m==="func");
+ $("f-param").hidden=m!=="param";$("f-func").hidden=m!=="func"}
+$("m-param").onclick=function(){setMode("param")};
+$("m-func").onclick=function(){setMode("func")};
+CHIPS.forEach(function(c){var b=document.createElement("button");b.className="chip";b.textContent=c.l;
+ b.onclick=function(){setMode(c.m);if(c.m==="func")$("ifn").value=c.f;else{$("ix").value=c.x;$("iy").value=c.y;$("it").value=c.T}};
+ $("chips").appendChild(b)});
+document.querySelectorAll("input").forEach(function(i){i.addEventListener("keydown",function(e){if(e.key==="Enter")fire()})});
+
+function load(i){lvl=i;attempts=0;trails=[];anim=null;fx=null;solved=false;
+ $("lv").textContent=i+1;$("at").textContent=0;$("next").hidden=true;$("fire").disabled=false;
+ var L=LEVELS[i];$("mission").innerHTML="Mục tiêu <b>M("+f1(L.t[0])+"; "+f1(L.t[1])+")</b>"+(L.w.length?" · có vật cản":"");
+ say("Nhập phương trình quỹ đạo rồi bấm Bắn.","info");draw()}
+$("clear").onclick=function(){trails=[];anim=null;fx=null;draw()};
+$("hint").onclick=function(){say("Gợi ý: "+LEVELS[lvl].hint,"info")};
+$("next").onclick=function(){if(lvl<LEVELS.length-1)load(lvl+1);else{score=0;$("sc").textContent=0;load(0)}};
+$("fire").onclick=fire;
+
+/* ---- bắn ---- */
+function fire(){
+ if(anim)return;
+ var fx_,fy_,T;
+ try{
+  if(mode==="param"){fx_=compile($("ix").value);fy_=compile($("iy").value);T=parseFloat(String($("it").value).replace(",","."));
+   if(!(T>0)||T>100)throw new Error("Khoảng t phải là số dương, tối đa 100.")}
+  else{fy_=compile($("ifn").value);T=X1;fx_=function(v){return v}}
+ }catch(e){say(e.message,"bad");return}
+ var L=LEVELS[lvl],pts=[],end="end",i,x,y;
+ for(i=0;i<=N;i++){
+  var v=T*i/N;x=fx_(v);y=fy_(v);
+  if(i===0&&(!isFinite(x)||!isFinite(y))){say("Phương trình không xác định tại t = 0 (hoặc x = 0).","bad");return}
+  if(i===0&&Math.hypot(x,y)>0.5){say("Đạn phải xuất phát từ súng O(0; 0). Hiện điểm đầu là ("+f1(x)+"; "+f1(y)+").","bad");return}
+  if(!isFinite(x)||!isFinite(y)){end="nan";break}
+  pts.push([x,y]);
+  if(Math.hypot(x-L.t[0],y-L.t[1])<=TR){end="hit";break}
+  var wl=L.w.some(function(w){return x>=w[0]&&x<=w[2]&&y>=w[1]&&y<=w[3]});
+  if(wl){end="wall";break}
+  if(i>4&&y<0){end="ground";break}
+  if(x<X0-1||x>X1+1||y>Y1+6){end="out";break}
+ }
+ if(pts.length>=2)angle=Math.atan2(pts[Math.min(5,pts.length-1)][1]-pts[0][1],pts[Math.min(5,pts.length-1)][0]-pts[0][0]);
+ attempts++;$("at").textContent=attempts;
+ anim={pts:pts,idx:0,end:end};$("fire").disabled=true;loop()}
+
+function finish(a){
+ var last=a.pts[a.pts.length-1],m={wall:"Đạn đụng tường tại ("+f1(last[0])+"; "+f1(last[1])+"). Thử đường cong cao hơn.",
+  ground:"Đạn chạm đất tại x ≈ "+f1(last[0])+". Mục tiêu ở x = "+f1(LEVELS[lvl].t[0])+".",
+  out:"Đạn bay ra ngoài khung. Kiểm tra lại hệ số hoặc khoảng t.",
+  end:"Đạn đã đi hết khoảng đã nhập mà chưa trúng mục tiêu. Thử tăng t hoặc đổi phương trình.",
+  nan:"Quỹ đạo không xác định tại một điểm (chia cho 0 hoặc căn số âm); đạn dừng ở ("+f1(last[0])+"; "+f1(last[1])+")."}[a.end];
+ trails.push({pts:a.pts,hit:a.end==="hit"});
+ if(a.end==="hit"){var gain=Math.max(20,100-20*(attempts-1));score+=gain;$("sc").textContent=score;solved=true;
+  fx={x:last[0],y:last[1],t0:performance.now()};
+  say("Trúng mục tiêu! +"+gain+" điểm"+(attempts===1?" (một phát trúng ngay)":" sau "+attempts+" lượt")+".","ok");
+  $("next").hidden=false;$("next").textContent=lvl<LEVELS.length-1?"Màn tiếp theo":"Hoàn thành! Chơi lại từ màn 1";$("fire").disabled=true}
+ else{say(m,"bad");$("fire").disabled=false}
+ anim=null;draw();if(fx)loop()}
+
+var raf=0;
+function loop(){if(raf)return;raf=requestAnimationFrame(function step(){raf=0;
+ if(anim){anim.idx=Math.min(anim.pts.length-1,anim.idx+Math.max(3,Math.round(anim.pts.length/110)));
+  draw();if(anim.idx>=anim.pts.length-1){finish(anim);}}
+ else draw();
+ if(anim||(fx&&performance.now()-fx.t0<900)){raf=requestAnimationFrame(step)}else{raf=0;fx=null;draw()}})}
+
+/* ---- vẽ ---- */
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+function resize(){var r=cv.getBoundingClientRect();dpr=window.devicePixelRatio||1;cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.height*dpr);draw()}
+function sx(x){return (x-X0)/(X1-X0)*cv.width}
+function sy(y){return (1-(y-Y0)/(Y1-Y0))*cv.height}
+function draw(){
+ var w=cv.width,h=cv.height,u=w/26,L=LEVELS[lvl],i;
+ ctx.clearRect(0,0,w,h);
+ ctx.fillStyle=css("--ground");ctx.fillRect(0,sy(0),w,h-sy(0));
+ ctx.lineWidth=1;ctx.font=(Math.max(10,u*0.34))+"px Consolas,monospace";
+ for(i=Math.ceil(X0);i<=X1;i++){ctx.strokeStyle=i%5===0?css("--grid2"):css("--grid");ctx.globalAlpha=i%5===0?.6:1;ctx.beginPath();ctx.moveTo(sx(i),0);ctx.lineTo(sx(i),h);ctx.stroke()}
+ for(i=Math.ceil(Y0);i<=Y1;i++){ctx.strokeStyle=i%5===0?css("--grid2"):css("--grid");ctx.globalAlpha=i%5===0?.6:1;ctx.beginPath();ctx.moveTo(0,sy(i));ctx.lineTo(w,sy(i));ctx.stroke()}
+ ctx.globalAlpha=1;ctx.strokeStyle=css("--ink");ctx.lineWidth=Math.max(1.5,u*0.05);
+ ctx.beginPath();ctx.moveTo(0,sy(0));ctx.lineTo(w,sy(0));ctx.moveTo(sx(0),0);ctx.lineTo(sx(0),h);ctx.stroke();
+ ctx.fillStyle=css("--mute");ctx.textAlign="center";ctx.textBaseline="top";
+ for(i=5;i<=X1;i+=5)ctx.fillText(i,sx(i),sy(0)+u*0.1);
+ ctx.textAlign="right";ctx.textBaseline="middle";
+ for(i=5;i<=Y1;i+=5)ctx.fillText(i,sx(0)-u*0.1,sy(i));
+ ctx.fillStyle=css("--ink");ctx.textAlign="left";ctx.textBaseline="bottom";
+ ctx.fillText("x",w-u*0.5,sy(0)-u*0.1);ctx.fillText("y",sx(0)+u*0.12,u*0.5);ctx.textBaseline="top";ctx.fillText("O",sx(0)-u*0.4,sy(0)+u*0.1);
+ /* tường */
+ ctx.fillStyle=css("--wall");
+ L.w.forEach(function(r){ctx.fillRect(sx(r[0]),sy(r[3]),sx(r[2])-sx(r[0]),sy(r[1])-sy(r[3]))});
+ /* vết đạn */
+ trails.forEach(function(t,k){strokePath(t.pts,t.pts.length-1,k===trails.length-1&&!anim?1:.35,t.hit?css("--hit"):css("--shot"),u)});
+ if(anim){strokePath(anim.pts,anim.idx,1,css("--shot"),u);var b=anim.pts[anim.idx];
+  ctx.fillStyle=css("--shot");ctx.beginPath();ctx.arc(sx(b[0]),sy(b[1]),u*0.17,0,7);ctx.fill()}
+ /* mục tiêu */
+ var tx=sx(L.t[0]),ty=sy(L.t[1]),R=TR*u;
+ [1,.66,.33].forEach(function(f,k){ctx.fillStyle=k%2?css("--surface"):css("--ring");ctx.beginPath();ctx.arc(tx,ty,R*f,0,7);ctx.fill()});
+ ctx.fillStyle=css("--ink");ctx.textAlign="center";ctx.textBaseline="bottom";
+ ctx.fillText("M("+f1(L.t[0])+"; "+f1(L.t[1])+")",tx,ty-R-u*0.08);
+ /* súng */
+ ctx.save();ctx.translate(sx(0),sy(0));ctx.rotate(-angle);ctx.fillStyle=css("--ink");ctx.fillRect(0,-u*0.12,u*0.9,u*0.24);ctx.restore();
+ ctx.fillStyle=css("--ink");ctx.beginPath();ctx.arc(sx(0),sy(0),u*0.32,0,7);ctx.fill();
+ /* hiệu ứng trúng */
+ if(fx){var q=Math.min(1,(performance.now()-fx.t0)/900);ctx.strokeStyle=css("--hit");ctx.globalAlpha=1-q;ctx.lineWidth=u*0.12;
+  ctx.beginPath();ctx.arc(sx(fx.x),sy(fx.y),R*(1+q*2.2),0,7);ctx.stroke();ctx.globalAlpha=1}
+ /* tọa độ con trỏ */
+ if(mouse){ctx.fillStyle=css("--ink");ctx.textAlign="right";ctx.textBaseline="top";ctx.fillText("("+f1(mouse[0])+"; "+f1(mouse[1])+")",w-u*0.2,u*0.2)}
+}
+function strokePath(pts,upto,alpha,col,u){ctx.globalAlpha=alpha;ctx.strokeStyle=col;ctx.lineWidth=Math.max(2,u*0.09);ctx.lineJoin="round";ctx.beginPath();
+ for(var i=0;i<=upto;i++){var X=sx(pts[i][0]),Y=sy(pts[i][1]);i?ctx.lineTo(X,Y):ctx.moveTo(X,Y)}ctx.stroke();ctx.globalAlpha=1}
+cv.addEventListener("pointermove",function(e){var r=cv.getBoundingClientRect();mouse=[X0+(e.clientX-r.left)/r.width*(X1-X0),Y1-(e.clientY-r.top)/r.height*(Y1-Y0)];if(!anim)draw()});
+cv.addEventListener("pointerleave",function(){mouse=null;if(!anim)draw()});
+window.addEventListener("resize",resize);
+if(window.matchMedia)window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change",draw);
+load(0);resize();
+})();
+</script>
+</body>
+</html>
